@@ -9,25 +9,33 @@ import Button from '../form/Button';
 import { BiArrowFromLeft } from 'react-icons/bi';
 import { cn } from '@/lib/utils';
 import Header from '../common/Header';
-import { createPost } from '@/actions/postServerActions';
+import { createPost, editPost } from '@/actions/postServerActions';
+import { Post } from '@prisma/client';
 
 interface IPostFormProps {
-    
+    post?: Post;
+    handleCloseEditing?: () => void;
 };
 
-const PostForm: React.FC<IPostFormProps> = () => {
+const PostForm: React.FC<IPostFormProps> = ({
+    post,
+    handleCloseEditing
+}) => {
     const [loading, setLoading] = React.useState<boolean>(false);
     const [success, setSuccess] = React.useState<string | undefined>();
     const [error, setError] = React.useState<string | undefined>();
 
-    const {register, handleSubmit, reset, formState: {errors}} = useForm<PostSchemaType>({
-        resolver: zodResolver(PostSchema)
+    const { register, handleSubmit, reset, formState: { errors } } = useForm<PostSchemaType>({
+        resolver: zodResolver(PostSchema),
+        defaultValues: {
+            title: post ? post.title : ''
+        }
     });
 
     React.useEffect(() => {
         if (success) {
             reset();
-            
+
             const timer = setTimeout(() => {
                 setSuccess(undefined);
             }, 2000)
@@ -38,21 +46,35 @@ const PostForm: React.FC<IPostFormProps> = () => {
 
     const onSubmit: SubmitHandler<PostSchemaType> = (data) => {
         setLoading(true);
-        createPost(data).then(data => {
-            setError(data.error);
-            setSuccess(data.success);
-        }).finally(() => {
-            setLoading(false);
-        })
+
+        if (post) {
+            editPost(post, data.title).then(data => {
+                setError(data.error);
+                setSuccess(data.success);
+                if (data.success && handleCloseEditing) {
+                    handleCloseEditing();
+                }
+            }).finally(() => {
+                setLoading(false);
+            })
+        } else {
+            createPost(data).then(data => {
+                setError(data.error);
+                setSuccess(data.success);
+            }).finally(() => {
+                setLoading(false);
+            })
+        }
     }
 
+
     return (
-        <form 
+        <form
             onSubmit={handleSubmit(onSubmit)}
-            className={cn('flex flex-col max-w-[500px] m-auto')}
+            className={cn('flex flex-col max-w-[500px] m-auto', post && 'mt-0')}
         >
-            <Header 
-                title={'Create Post'}
+            <Header
+                title={post ? 'Edit Post' : 'Create Post'}
                 large
             />
             <InputField
@@ -64,8 +86,8 @@ const PostForm: React.FC<IPostFormProps> = () => {
             />
             {error && <div className="text-sm text-rose-400">{error}</div>}
             {success && <div className="text-sm text-green-400">{success}</div>}
-            <Button 
-                label={loading ? 'Submitting' : 'Submit'} 
+            <Button
+                label={loading ? 'Submitting' : 'Submit'}
                 icon={loading ? undefined : BiArrowFromLeft}
                 disabled={loading}
             />
